@@ -1,24 +1,22 @@
-export default function Chat() {
+import { useApiQuery } from "@/lib/apiHooks";
+
+const Chat = () => {
+  const { data, isLoading } = useApiQuery(
+    ["chatMessages"],
+    "/api/chat/messages"
+  );
+
+  if (isLoading) return <div>Loading...</div>;
+
   return (
-    <div className="bg-white rounded-xl border h-full flex flex-col">
-      
-      <div className="border-b px-4 py-3 text-sm font-medium">
-        AI Chat
-      </div>
+    <div>
+      <h1 className="text-xl font-semibold mb-4">Chat</h1>
 
-      <div className="flex-1 p-4 overflow-y-auto text-sm text-slate-500">
-        Your conversation will appear here...
-      </div>
-
-      <div className="border-t p-3 flex gap-2">
-        <input
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
-          placeholder="Ask anything..."
-        />
-        <button className="bg-black text-white px-4 rounded-lg text-sm">
-          Send
-        </button>
-      </div>
+      <pre className="bg-gray-100 p-4 rounded-md">
+        {JSON.stringify(data, null, 2)}
+      </pre>
     </div>
   );
-}
+};
+
+export default Chat;
