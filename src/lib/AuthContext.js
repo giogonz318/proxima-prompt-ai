@@ -1,7 +1,7 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
-import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import React, { createContext, useState, useContext, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { appParams } from "./app-params";
+import { createAxiosClient } from "@base44/sdk/dist/utils/axios-client";
 
 const AuthContext = createContext();
 
@@ -28,10 +28,10 @@ export const AuthProvider = ({ children }) => {
       const appClient = createAxiosClient({
         baseURL: `/api/apps/public`,
         headers: {
-          'X-App-Id': appParams.appId
+          "X-App-Id": appParams.appId,
         },
         token: appParams.token,
-        interceptResponses: true
+        interceptResponses: true,
       });
 
       const publicSettings = await appClient.get(
@@ -48,9 +48,8 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
       }
-
     } catch (appError) {
-      console.error('App state check failed:', appError);
+      console.error("App state check failed:", appError);
 
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
@@ -59,15 +58,15 @@ export const AuthProvider = ({ children }) => {
 
       const reason = appError?.data?.extra_data?.reason;
 
-      if (appError.status === 403 && reason) {
+      if (appError?.status === 403 && reason) {
         setAuthError({
           type: reason,
-          message: appError.message
+          message: appError.message,
         });
       } else {
         setAuthError({
-          type: 'unknown',
-          message: appError.message || 'Failed to load app'
+          type: "unknown",
+          message: appError?.message || "Failed to load app",
         });
       }
     }
@@ -81,15 +80,15 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setAuthError(null);
     } catch (error) {
-      console.error('User auth check failed:', error);
+      console.error("User auth check failed:", error);
 
       setUser(null);
       setIsAuthenticated(false);
 
-      if (error.status === 401 || error.status === 403) {
+      if (error?.status === 401 || error?.status === 403) {
         setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
+          type: "auth_required",
+          message: "Authentication required",
         });
       }
     } finally {
@@ -101,15 +100,20 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
 
+    // SAFE: avoid direct window dependency in argument passing
     if (shouldRedirect) {
-      base44.auth.logout(window.location.href);
+      const redirectUrl =
+        typeof window !== "undefined" ? window.location.href : "/";
+      base44.auth.logout(redirectUrl);
     } else {
       base44.auth.logout();
     }
   };
 
   const navigateToLogin = () => {
-    base44.auth.redirectToLogin(window.location.href);
+    const redirectUrl =
+      typeof window !== "undefined" ? window.location.href : "/";
+    base44.auth.redirectToLogin(redirectUrl);
   };
 
   return (
@@ -123,7 +127,7 @@ export const AuthProvider = ({ children }) => {
         appPublicSettings,
         logout,
         navigateToLogin,
-        checkAppState
+        checkAppState,
       }}
     >
       {children}
@@ -135,7 +139,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;
