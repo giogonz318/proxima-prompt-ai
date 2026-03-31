@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Sparkles, Star, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CosmosBackground from '../components/chat/CosmosBackground';
@@ -64,8 +64,11 @@ const TIERS = [
 ];
 
 export default function Subscription() {
+  const navigate = useNavigate();
+
   const [currentSub, setCurrentSub] = useState(null);
   const [user, setUser] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(null);
@@ -76,16 +79,21 @@ export default function Subscription() {
         const u = await base44.auth.me();
         setUser(u);
 
+        if (!u?.email) return;
+
         const subs = await base44.entities.Subscription.filter({
           user_email: u.email,
           status: 'active',
         });
 
-        if (subs && subs.length > 0) {
+        if (subs?.length > 0) {
           setCurrentSub(subs[0]);
         }
       } catch (err) {
         console.error('Failed to load subscription:', err);
+
+        // optional safety redirect
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -96,8 +104,7 @@ export default function Subscription() {
 
   const handleCheckout = async (tierId) => {
     if (tierId === 'kuiper') {
-      handleSelect(tierId);
-      return;
+      return handleSelect(tierId);
     }
 
     setCheckoutLoading(tierId);
@@ -111,62 +118,72 @@ export default function Subscription() {
 
       const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(data?.error || 'Checkout failed');
+      }
+
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
-      } else {
-        alert(data.error || 'Checkout failed. Please try again.');
       }
     } catch (err) {
       console.error(err);
-      alert('Could not start checkout. Please try again.');
+      alert(err.message || 'Could not start checkout.');
+    } finally {
+      setCheckoutLoading(null);
     }
-
-    setCheckoutLoading(null);
   };
 
   const handleSelect = async (tierId) => {
-    if (!user) return;
+    if (!user?.email || selecting) return;
 
     setSelecting(tierId);
 
     try {
-      const today = new Date().toISOString();
-      const expires = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
-      ).toISOString();
+      const now = new Date();
+      const expires = new Date(Date.now() + 30 * 86400000);
 
-      if (currentSub) {
+      const payload = {
+        tier: tierId,
+        status: 'active',
+        started_date: now.toISOString(),
+        expires_date: expires.toISOString(),
+      };
+
+      if (currentSub?.id) {
         const updated = await base44.entities.Subscription.update(
           currentSub.id,
-          {
-            tier: tierId,
-            status: 'active',
-            started_date: today,
-            expires_date: expires,
-          }
+          payload
         );
         setCurrentSub(updated);
       } else {
         const created = await base44.entities.Subscription.create({
           user_email: user.email,
-          tier: tierId,
-          status: 'active',
-          started_date: today,
-          expires_date: expires,
+          ...payload,
         });
         setCurrentSub(created);
       }
     } catch (err) {
       console.error('Failed to activate plan:', err);
+      alert('Failed to activate plan.');
+    } finally {
+      setSelecting(null);
     }
-
-    setSelecting(null);
   };
 
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Button onClick={() => navigate('/login')}>
+          Go to Login
+        </Button>
       </div>
     );
   }
@@ -194,16 +211,13 @@ export default function Subscription() {
           </motion.h1>
 
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            From the edge of the solar system to the farthest galaxy — pick the tier that matches your journey.
+            From the edge of the solar system to the farthest galaxy — pick your tier.
           </p>
 
           {currentSub && (
             <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full text-sm text-primary">
               <Sparkles className="w-4 h-4" />
-              Currently on{' '}
-              <strong className="capitalize ml-1">
-                {currentSub.tier}
-              </strong>
+              Current plan: <strong className="capitalize">{currentSub.tier}</strong>
             </div>
           )}
         </div>
@@ -225,12 +239,6 @@ export default function Subscription() {
                     : ''
                 }`}
               >
-                {tier.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full">
-                    Most Popular
-                  </div>
-                )}
-
                 <div>
                   <div
                     className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tier.color} flex items-center justify-center mb-3`}
@@ -245,9 +253,7 @@ export default function Subscription() {
                 </div>
 
                 <div className="flex items-end gap-1">
-                  <span className="text-3xl font-bold">
-                    {tier.price}
-                  </span>
+                  <span className="text-3xl font-bold">{tier.price}</span>
                   <span className="text-sm text-muted-foreground mb-1">
                     {tier.period}
                   </span>
@@ -255,10 +261,7 @@ export default function Subscription() {
 
                 <ul className="space-y-2.5 flex-1">
                   {tier.features.map((f) => (
-                    <li
-                      key={f}
-                      className="flex items-start gap-2 text-sm"
-                    >
+                    <li key={f} className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
                       {f}
                     </li>
@@ -285,7 +288,7 @@ export default function Subscription() {
                   ) : selecting === tier.id ? (
                     'Activating...'
                   ) : isActive ? (
-                    '✓ Current Plan'
+                    'Current Plan'
                   ) : tier.id === 'kuiper' ? (
                     'Get Started Free'
                   ) : (

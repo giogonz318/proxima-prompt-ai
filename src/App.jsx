@@ -16,7 +16,7 @@ import Subscription from "./pages/Subscription";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 
-import PageNotFound from "./lib/PageNotFound";
+import PageNotFound from "@/lib/PageNotFound";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
